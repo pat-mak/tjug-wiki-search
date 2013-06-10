@@ -7,6 +7,7 @@ import pl.jug.trojmiasto.lucene.model.Article;
 import pl.jug.trojmiasto.lucene.model.Category;
 
 public class SearchResult {
+	private static final int MICRO_TO_MILIS = 1000000;
 	private List<Article> articles = new LinkedList<Article>();
 	private List<Category> categories = new LinkedList<Category>();
 	private int count;
@@ -15,7 +16,7 @@ public class SearchResult {
 	private String failMessage = "";
 	
 	public long getSearchTime() {
-		return (int) searchTime / 1000000;
+		return (int) searchTime / MICRO_TO_MILIS;
 	}
 
 	public void setSearchTime(long searchTime) {

@@ -13,9 +13,7 @@ public class Searcher {
 		return fakeResults();
 	}
 
-
-	public SearchResult searchWithCategoriesAndHighlight(int i, int j,
-			String query) {
+	public SearchResult search(String query) {
 		// TODO to są przykładowe dane
 		List<Category> categories = new LinkedList<Category>();
 		categories.add(new Category("root/Java", 1));
@@ -26,7 +24,8 @@ public class Searcher {
 
 	private SearchResult fakeResults() {
 		List<Article> articles = new LinkedList<Article>();
-		articles.add(new Article("JUG", "Przykładowy artykuł.", "Java", "2013-03-12T13:38:36Z"));
+		articles.add(new Article("JUG", "Przykładowy artykuł.", "Java",
+				"2013-03-12T13:38:36Z"));
 		SearchResult searchResult = new SearchResult();
 		searchResult.setArticles(articles);
 		searchResult.setCount(1);

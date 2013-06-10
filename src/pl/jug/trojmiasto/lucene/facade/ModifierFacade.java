@@ -5,11 +5,11 @@ import java.util.Date;
 
 import pl.jug.trojmiasto.lucene.modify.Modifier;
 
-public class ModificationFacade {
+public class ModifierFacade {
 
-	Modifier modifier;
+	private Modifier modifier;
 
-	public ModificationFacade() throws IOException {
+	public ModifierFacade() throws IOException {
 		modifier = new Modifier();
 
 	}

@@ -7,7 +7,7 @@ import pl.jug.trojmiasto.lucene.search.Searcher;
 
 public class SearchFacade {
 
-	private static Searcher searcher;
+	private Searcher searcher;
 
 	public SearchFacade() throws IOException {
 		searcher = new Searcher();
@@ -17,7 +17,7 @@ public class SearchFacade {
 		return searcher.searchPrefix(query, 20);
 	}
 
-	public SearchResult searchWithCategories(String query){
-		return searcher.searchWithCategoriesAndHighlight(100, 10, query);
+	public SearchResult search(String query){
+		return searcher.search(query);
 	}
 }

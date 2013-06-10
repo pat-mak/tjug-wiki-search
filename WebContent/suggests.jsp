@@ -3,14 +3,14 @@
 <%@page import="pl.jug.trojmiasto.lucene.facade.SearchFacade"%>
 <%@ page language="java" contentType="text/html; charset=UTF-8"
 	pageEncoding="UTF-8"%>
-<jsp:useBean id="searcher"
+<jsp:useBean id="searchFacade"
 	class="pl.jug.trojmiasto.lucene.facade.SearchFacade" scope="request" />
 <%
-	String query = request.getParameter("term");
+	String prefix = request.getParameter("term");
 
-	String buffer = "[";
-	SearchResult result = searcher.suggestions(query);
+	SearchResult result = searchFacade.suggestions(prefix);
 	
+	String buffer = "[";
 	for (Article article : result.getArticles()) {
 		buffer = buffer + "\"" + article.getTitle() + "\",";
 	}

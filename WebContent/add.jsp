@@ -1,7 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
 	pageEncoding="UTF-8"%>
-<jsp:useBean id="modifier"
-	class="pl.jug.trojmiasto.lucene.facade.ModificationFacade"
+<jsp:useBean id="modifierFacade"
+	class="pl.jug.trojmiasto.lucene.facade.ModifierFacade"
 	scope="application" /><!doctype html>
 <html>
 <head>
@@ -41,7 +41,7 @@
 		String title = request.getParameter("title");
 		String category = request.getParameter("category");
 		String content = request.getParameter("content");
-		if (modifier.add(title, category, content)) {
+		if (modifierFacade.add(title, category, content)) {
 			saveMsg = "Artykuł <b>" + title
 					+ "</b> został pomyślnie zapisany.";
 		} else {
@@ -64,7 +64,7 @@
 						}
 					%>
 					<div>
-						Tutył<br /> <input name="title" size="40" id="tags" />
+						Tytuł<br /> <input name="title" size="40" id="tags" />
 					</div>
 					<div>
 						Kategoria<br /> <input name="category" size="40" id="tags" />

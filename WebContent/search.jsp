@@ -3,7 +3,7 @@
 <%@page import="pl.jug.trojmiasto.lucene.model.Article"%>
 <%@ page language="java" contentType="text/html; charset=UTF-8"
 	pageEncoding="UTF-8"%>
-<jsp:useBean id="searcher"
+<jsp:useBean id="searchFacade"
 	class="pl.jug.trojmiasto.lucene.facade.SearchFacade" scope="application" /><!doctype html>
 <html>
 <head>
@@ -99,7 +99,7 @@
 			</div>
 		</div>
 	</div>
-	<% SearchResult result = searcher.searchWithCategories(query); %>
+	<% SearchResult result = searchFacade.search(query); %>
 	<!-- Wyniki kategoryzacji dla parametru query-->
 	<div id="categories">
 		<h2>Kategorie</h2>
