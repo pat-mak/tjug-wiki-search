@@ -11,6 +11,10 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.analyzing.AnalyzingQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParser.Operator;
+import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
@@ -58,20 +62,30 @@ public class Searcher {
 
 	public SearchResult search(String query, int count) throws IOException {
 		SearchResult searchResult = new SearchResult();
-		AnalyzingQueryParser queryParser = new AnalyzingQueryParser(WikiIndexConfig.LUCENE_VERSION,
+		QueryParser titleQueryParser = new AnalyzingQueryParser(WikiIndexConfig.LUCENE_VERSION,
 				WikiIndexConfig.TITLE_FIELD_NAME, new StandardAnalyzer(
 						WikiIndexConfig.LUCENE_VERSION));
+		QueryParser contentQueryParser = new AnalyzingQueryParser(WikiIndexConfig.LUCENE_VERSION,
+				WikiIndexConfig.CONTENT_FIELD_NAME, new StandardAnalyzer(
+						WikiIndexConfig.LUCENE_VERSION));
+		
 		Query titleQuery = null;
+		Query contentQuery = null;
 		try {
-			titleQuery = queryParser.parse(query);
+			titleQuery = titleQueryParser.parse(query);
+			contentQuery = contentQueryParser.parse(query);
 		} catch (ParseException e) {
 			searchResult.markFailed("Zapytanie było złe! i tory też...były złe, bo "+e.getMessage());
 			e.printStackTrace();
 			return searchResult;
 		}
+		BooleanQuery booleanQuery = new BooleanQuery();
+		booleanQuery.add(titleQuery, Occur.SHOULD);
+		booleanQuery.add(contentQuery, Occur.SHOULD);
 		
-		TopDocs topDocs = searcher.search(titleQuery, count);
+		TopDocs topDocs = searcher.search(booleanQuery, count);
 		searchResult.setArticles(extractArticlesFromTopDocs(topDocs));
+		searchResult.setCount(topDocs.totalHits);
 		return searchResult;
 	}
 

@@ -117,7 +117,7 @@
 		<%if (!result.isSearchSucceded()) { %>
 		<h2>Wyszukiwanie nie powiodło się bo: <%=result.getFailMessage() %></h2>
 		<%} else { %>
-		<h2>Wyników: <%= result.getCount() %>(<%= result.getSearchTime() %>ms)</h2>
+		<h2>Wyników: <%= result.getCount() %>&nbsp;(<%= result.getSearchTime() %>ms)</h2>
 		<%
 			for (Article article : result.getArticles()) {
 		%>
@@ -127,7 +127,7 @@
 				<div class="date"><%=article.getTimeString()%></div>
 			</div>
 			<div class="article-category">Kategoria: <%=article.getCategory()%></div>
-			<div class="description"><%=article.getContent()%></div>
+			<div class="description"><%=article.getContent().substring(0, 100)%></div>
 		</div>
 
 		<%
