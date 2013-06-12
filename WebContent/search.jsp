@@ -1,3 +1,4 @@
+<%@page import="pl.jug.trojmiasto.lucene.facade.SearchFacade"%>
 <%@page import="pl.jug.trojmiasto.lucene.search.SearchResult"%>
 <%@page import="pl.jug.trojmiasto.lucene.model.Category"%>
 <%@page import="pl.jug.trojmiasto.lucene.model.Article"%>

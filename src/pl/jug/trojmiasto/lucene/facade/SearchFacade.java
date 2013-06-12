@@ -13,7 +13,7 @@ public class SearchFacade {
 		searcher = new Searcher();
 	}
 	
-	public SearchResult suggestions(String query) {
+	public SearchResult suggestions(String query) throws IOException {
 		return searcher.searchPrefix(query, 20);
 	}
 
