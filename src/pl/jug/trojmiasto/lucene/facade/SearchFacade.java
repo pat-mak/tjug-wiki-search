@@ -12,12 +12,12 @@ public class SearchFacade {
 	public SearchFacade() throws IOException {
 		searcher = new Searcher();
 	}
-	
+
 	public SearchResult suggestions(String query) throws IOException {
 		return searcher.searchPrefix(query, 20);
 	}
 
-	public SearchResult search(String query){
-		return searcher.search(query);
+	public SearchResult search(String query) throws IOException {
+		return searcher.search(query, 20);
 	}
 }

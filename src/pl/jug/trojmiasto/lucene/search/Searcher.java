@@ -12,12 +12,12 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
 
 import pl.jug.trojmiasto.lucene.index.WikiIndexConfig;
 import pl.jug.trojmiasto.lucene.model.Article;
-import pl.jug.trojmiasto.lucene.model.Category;
 
 public class Searcher {
 
@@ -52,23 +52,12 @@ public class Searcher {
 		return articles;
 	}
 
-	public SearchResult search(String query) {
-		// TODO to są przykładowe dane
-		List<Category> categories = new LinkedList<Category>();
-		categories.add(new Category("root/Java", 1));
-		SearchResult searchResult = fakeResults();
-		searchResult.setCategories(categories);
+	public SearchResult search(String query, int count) throws IOException {
+		SearchResult searchResult = new SearchResult();
+		TermQuery termQuery = new TermQuery(new Term(WikiIndexConfig.TITLE_FIELD_NAME, query));
+		TopDocs topDocs = searcher.search(termQuery, count);
+		searchResult.setArticles(extractArticlesFromTopDocs(topDocs));
 		return searchResult;
 	}
 
-	private SearchResult fakeResults() {
-		List<Article> articles = new LinkedList<Article>();
-		articles.add(new Article("JUG", "Przykładowy artykuł.", "Java",
-				"2013-03-12T13:38:36Z"));
-		SearchResult searchResult = new SearchResult();
-		searchResult.setArticles(articles);
-		searchResult.setCount(1);
-		searchResult.setSearchTime(3000000);
-		return searchResult;
-	}
 }
