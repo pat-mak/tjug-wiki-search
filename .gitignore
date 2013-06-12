@@ -3,4 +3,5 @@
 .project
 build
 /target
-WebContent
+WebContent/WEB-INF/classes/
+WebContent/WEB-INF/lib/
