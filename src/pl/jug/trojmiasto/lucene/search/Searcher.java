@@ -8,6 +8,16 @@ import java.util.List;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.facet.params.FacetSearchParams;
+import org.apache.lucene.facet.search.CountFacetRequest;
+import org.apache.lucene.facet.search.FacetRequest;
+import org.apache.lucene.facet.search.FacetResult;
+import org.apache.lucene.facet.search.FacetResultNode;
+import org.apache.lucene.facet.search.FacetsAccumulator;
+import org.apache.lucene.facet.search.FacetsCollector;
+import org.apache.lucene.facet.taxonomy.CategoryPath;
+import org.apache.lucene.facet.taxonomy.TaxonomyReader;
+import org.apache.lucene.facet.taxonomy.directory.DirectoryTaxonomyReader;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.analyzing.AnalyzingQueryParser;
@@ -16,10 +26,13 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.MultiCollector;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.TopDocsCollector;
+import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.highlight.Highlighter;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.highlight.QueryScorer;
@@ -29,15 +42,20 @@ import org.apache.lucene.store.FSDirectory;
 
 import pl.jug.trojmiasto.lucene.index.WikiIndexConfig;
 import pl.jug.trojmiasto.lucene.model.Article;
+import pl.jug.trojmiasto.lucene.model.Category;
 
 public class Searcher {
 
 	private static final String HL_SEPARATOR = "<span class=\"separator\">&nbsp;(...)</span>";
 	private IndexSearcher searcher;
+	private TaxonomyReader taxonomyReader;
 
 	public Searcher() throws IOException {
 		searcher = new IndexSearcher(DirectoryReader.open(FSDirectory
 				.open(new File(WikiIndexConfig.INDEX_PATH))));
+		taxonomyReader = new DirectoryTaxonomyReader(FSDirectory.open(new File(
+				WikiIndexConfig.INDEX_PATH
+						+ WikiIndexConfig.TAXO_INDEX_PATH_SUFFIX)));
 	}
 
 	public SearchResult searchPrefix(String query, int i) throws IOException {
@@ -78,14 +96,22 @@ public class Searcher {
 			e.printStackTrace();
 			return searchResult;
 		}
-		TopDocs topDocs = searcher.search(booleanQuery, count);
+
+		FacetsCollector categoryCollector = prepateCategoryCollector();
+		TopDocsCollector<ScoreDoc> docsCollector = TopScoreDocCollector.create(
+				count, false);
+		searcher.search(booleanQuery,
+				MultiCollector.wrap(docsCollector, categoryCollector));
 
 		Highlighter highlighter = new Highlighter(new SimpleHTMLFormatter(),
 				new QueryScorer(booleanQuery));
 
+		TopDocs topDocs = docsCollector.topDocs();
 		try {
 			searchResult.setArticles(extractArticlesFromTopDocs(topDocs,
 					highlighter));
+			searchResult
+					.setCategories(extractCaegoriesFromTopDocs(categoryCollector));
 		} catch (InvalidTokenOffsetsException e) {
 			searchResult
 					.markFailed("Podświetlanie było złe! i tory też...były złe, bo "
@@ -142,4 +168,30 @@ public class Searcher {
 		}
 		return articles;
 	}
+
+	private FacetsCollector prepateCategoryCollector() {
+		FacetRequest facetRequest = new CountFacetRequest(new CategoryPath(
+				WikiIndexConfig.ROOT_CAT), 20);
+		facetRequest.setDepth(2);
+		FacetsCollector collector = FacetsCollector
+				.create(new FacetsAccumulator(new FacetSearchParams(
+						facetRequest), searcher.getIndexReader(),
+						taxonomyReader));
+		return collector;
+	}
+
+	private List<Category> extractCaegoriesFromTopDocs(
+			FacetsCollector categoryCollector) throws IOException {
+		List<FacetResult> facetResults = categoryCollector.getFacetResults();
+		List<Category> categories = new LinkedList<Category>();
+		for (FacetResult facetResult : facetResults) {
+			List<FacetResultNode> subResults = facetResult.getFacetResultNode().subResults;
+			for (FacetResultNode facetResultNode : subResults) {
+				categories.add(new Category(facetResultNode.label.toString(),
+						(int) facetResultNode.value));
+			}
+		}
+		return categories;
+	}
+
 }

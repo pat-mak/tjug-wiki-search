@@ -2,11 +2,17 @@ package pl.jug.trojmiasto.lucene.index;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
+import org.apache.lucene.facet.index.FacetFields;
+import org.apache.lucene.facet.taxonomy.CategoryPath;
+import org.apache.lucene.facet.taxonomy.TaxonomyWriter;
+import org.apache.lucene.facet.taxonomy.directory.DirectoryTaxonomyWriter;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
@@ -15,8 +21,9 @@ import org.apache.lucene.store.FSDirectory;
 import pl.jug.trojmiasto.lucene.model.Article;
 
 public class Indexer {
-
 	private IndexWriter indexWriter;
+	private TaxonomyWriter taxonomyWriter;
+	private FacetFields facetFields;
 
 	public Indexer(String indexPath, OpenMode openMode) throws IOException {
 		openIndex(indexPath, openMode);
@@ -30,6 +37,10 @@ public class Indexer {
 		conf.setOpenMode(openMode);
 		indexWriter = new IndexWriter(FSDirectory.open(new File(indexPath)),
 				conf);
+
+		taxonomyWriter = new DirectoryTaxonomyWriter(FSDirectory.open(new File(
+				indexPath + WikiIndexConfig.TAXO_INDEX_PATH_SUFFIX)), openMode);
+		facetFields = new FacetFields(taxonomyWriter);
 	}
 
 	public void indexAll(WikiDataProvider wikiDataProvider) throws IOException {
@@ -41,7 +52,15 @@ public class Indexer {
 	}
 
 	private void addArticle(Article article) throws IOException {
-		indexWriter.addDocument(articleToDocument(article));
+		Document document = articleToDocument(article);
+
+		List<CategoryPath> categoryPaths = new LinkedList<CategoryPath>();
+		categoryPaths.add(new CategoryPath(WikiIndexConfig.ROOT_CAT
+				+ article.getCategory(), '/'));
+		facetFields.addFields(document, categoryPaths);
+
+		indexWriter.addDocument(document);
+
 	}
 
 	private Document articleToDocument(Article article) {
@@ -67,5 +86,6 @@ public class Indexer {
 
 	private void closeIndex() throws IOException {
 		indexWriter.close();
+		taxonomyWriter.close();
 	}
 }
