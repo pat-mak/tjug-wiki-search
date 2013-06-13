@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
@@ -12,7 +13,6 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.analyzing.AnalyzingQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.queryparser.classic.QueryParser.Operator;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
@@ -20,6 +20,11 @@ import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.highlight.Highlighter;
+import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
+import org.apache.lucene.search.highlight.QueryScorer;
+import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
+import org.apache.lucene.search.highlight.TokenSources;
 import org.apache.lucene.store.FSDirectory;
 
 import pl.jug.trojmiasto.lucene.index.WikiIndexConfig;
@@ -27,6 +32,7 @@ import pl.jug.trojmiasto.lucene.model.Article;
 
 public class Searcher {
 
+	private static final String HL_SEPARATOR = "<span class=\"separator\">&nbsp;(...)</span>";
 	private IndexSearcher searcher;
 
 	public Searcher() throws IOException {
@@ -62,31 +68,78 @@ public class Searcher {
 
 	public SearchResult search(String query, int count) throws IOException {
 		SearchResult searchResult = new SearchResult();
-		QueryParser titleQueryParser = new AnalyzingQueryParser(WikiIndexConfig.LUCENE_VERSION,
-				WikiIndexConfig.TITLE_FIELD_NAME, new StandardAnalyzer(
-						WikiIndexConfig.LUCENE_VERSION));
-		QueryParser contentQueryParser = new AnalyzingQueryParser(WikiIndexConfig.LUCENE_VERSION,
-				WikiIndexConfig.CONTENT_FIELD_NAME, new StandardAnalyzer(
-						WikiIndexConfig.LUCENE_VERSION));
-		
-		Query titleQuery = null;
-		Query contentQuery = null;
+		BooleanQuery booleanQuery;
 		try {
-			titleQuery = titleQueryParser.parse(query);
-			contentQuery = contentQueryParser.parse(query);
+			booleanQuery = prepareBooleanQuery(query);
 		} catch (ParseException e) {
-			searchResult.markFailed("Zapytanie było złe! i tory też...były złe, bo "+e.getMessage());
+			searchResult
+					.markFailed("Zapytanie było złe! i tory też...były złe, bo "
+							+ e.getMessage());
 			e.printStackTrace();
 			return searchResult;
 		}
-		BooleanQuery booleanQuery = new BooleanQuery();
-		booleanQuery.add(titleQuery, Occur.SHOULD);
-		booleanQuery.add(contentQuery, Occur.SHOULD);
-		
 		TopDocs topDocs = searcher.search(booleanQuery, count);
-		searchResult.setArticles(extractArticlesFromTopDocs(topDocs));
+
+		Highlighter highlighter = new Highlighter(new SimpleHTMLFormatter(),
+				new QueryScorer(booleanQuery));
+
+		try {
+			searchResult.setArticles(extractArticlesFromTopDocs(topDocs,
+					highlighter));
+		} catch (InvalidTokenOffsetsException e) {
+			searchResult
+					.markFailed("Podświetlanie było złe! i tory też...były złe, bo "
+							+ e.getMessage());
+			e.printStackTrace();
+			return searchResult;
+		}
 		searchResult.setCount(topDocs.totalHits);
 		return searchResult;
 	}
 
+	private BooleanQuery prepareBooleanQuery(String userQuery)
+			throws ParseException {
+		QueryParser titleQueryParser = new AnalyzingQueryParser(
+				WikiIndexConfig.LUCENE_VERSION,
+				WikiIndexConfig.TITLE_FIELD_NAME, new StandardAnalyzer(
+						WikiIndexConfig.LUCENE_VERSION));
+		QueryParser contentQueryParser = new AnalyzingQueryParser(
+				WikiIndexConfig.LUCENE_VERSION,
+				WikiIndexConfig.CONTENT_FIELD_NAME, new StandardAnalyzer(
+						WikiIndexConfig.LUCENE_VERSION));
+
+		Query titleQuery = null;
+		Query contentQuery = null;
+		titleQuery = titleQueryParser.parse(userQuery);
+		contentQuery = contentQueryParser.parse(userQuery);
+		BooleanQuery booleanQuery = new BooleanQuery();
+		booleanQuery.add(titleQuery, Occur.SHOULD);
+		booleanQuery.add(contentQuery, Occur.SHOULD);
+		return booleanQuery;
+	}
+
+	private List<Article> extractArticlesFromTopDocs(TopDocs topDocs,
+			Highlighter highlighter) throws IOException,
+			InvalidTokenOffsetsException {
+		ScoreDoc[] scoreDocs = topDocs.scoreDocs;
+		List<Article> articles = new LinkedList<Article>();
+		for (ScoreDoc scoreDoc : scoreDocs) {
+			Document document = searcher.doc(scoreDoc.doc);
+
+			String content = document.get(WikiIndexConfig.CONTENT_FIELD_NAME);
+			TokenStream tokenStream = TokenSources.getAnyTokenStream(searcher
+					.getIndexReader(), scoreDoc.doc,
+					WikiIndexConfig.CONTENT_FIELD_NAME, new StandardAnalyzer(
+							WikiIndexConfig.LUCENE_VERSION));
+
+			Article article = new Article(
+					document.get(WikiIndexConfig.TITLE_FIELD_NAME),
+					highlighter.getBestFragments(tokenStream, content, 3,
+							HL_SEPARATOR),
+					document.get(WikiIndexConfig.CATEGORY_FIELD_NAME),
+					document.get(WikiIndexConfig.TIME_STRING_FIELD_NAME));
+			articles.add(article);
+		}
+		return articles;
+	}
 }

@@ -127,7 +127,7 @@
 				<div class="date"><%=article.getTimeString()%></div>
 			</div>
 			<div class="article-category">Kategoria: <%=article.getCategory()%></div>
-			<div class="description"><%=article.getContent().substring(0, 100)%></div>
+			<div class="description"><%=article.getContent()%></div>
 		</div>
 
 		<%

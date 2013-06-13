@@ -8,7 +8,7 @@ public class IndexerApp {
 
 	public static void main(String[] args) throws IOException {
 		Indexer indexer = new Indexer(WikiIndexConfig.INDEX_PATH, OpenMode.CREATE);
-		indexer.indexAll(new WikiDataProvider("/tmp/wikipedia-15.indexData"));
+		indexer.indexAll(new WikiDataProvider("/tmp/wikipedia-15000.indexData"));
 	}
 
 }
