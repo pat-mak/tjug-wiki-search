@@ -30,9 +30,11 @@ import org.apache.lucene.search.MultiCollector;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.SortField.Type;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.TopDocsCollector;
-import org.apache.lucene.search.TopScoreDocCollector;
+import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.highlight.Highlighter;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.highlight.QueryScorer;
@@ -98,15 +100,17 @@ public class Searcher {
 		}
 
 		FacetsCollector categoryCollector = prepateCategoryCollector();
-		TopDocsCollector<ScoreDoc> docsCollector = TopScoreDocCollector.create(
-				count, false);
+		Sort sort = new Sort(new SortField(
+				WikiIndexConfig.TIME_STRING_FIELD_NAME, Type.STRING, true));
+		TopFieldCollector topFieldCollector = TopFieldCollector.create(sort,
+				count, true, false, false, false);
 		searcher.search(booleanQuery,
-				MultiCollector.wrap(docsCollector, categoryCollector));
+				MultiCollector.wrap(topFieldCollector, categoryCollector));
 
 		Highlighter highlighter = new Highlighter(new SimpleHTMLFormatter(),
 				new QueryScorer(booleanQuery));
 
-		TopDocs topDocs = docsCollector.topDocs();
+		TopDocs topDocs = topFieldCollector.topDocs();
 		try {
 			searchResult.setArticles(extractArticlesFromTopDocs(topDocs,
 					highlighter));

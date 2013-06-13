@@ -69,12 +69,16 @@ public class Indexer {
 		textField.setStored(true);
 		textField.setIndexed(true);
 		textField.setTokenized(true);
+		FieldType textFieldNotAnalyzed = new FieldType();
+		textFieldNotAnalyzed.setStored(true);
+		textFieldNotAnalyzed.setIndexed(true);
+		textFieldNotAnalyzed.setTokenized(false);
 		Field title = new Field(WikiIndexConfig.TITLE_FIELD_NAME,
 				article.getTitle(), textField);
 		Field content = new Field(WikiIndexConfig.CONTENT_FIELD_NAME,
 				article.getContent(), textField);
 		Field date = new Field(WikiIndexConfig.TIME_STRING_FIELD_NAME,
-				article.getTimeString(), textField);
+				article.getTimeString(), textFieldNotAnalyzed);
 		Field category = new Field(WikiIndexConfig.CATEGORY_FIELD_NAME,
 				article.getCategory(), textField);
 		document.add(title);
