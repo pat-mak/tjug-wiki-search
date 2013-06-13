@@ -138,6 +138,7 @@ public class Searcher {
 		Query contentQuery = null;
 		titleQuery = titleQueryParser.parse(userQuery);
 		contentQuery = contentQueryParser.parse(userQuery);
+		contentQuery.setBoost(20.0f);
 		BooleanQuery booleanQuery = new BooleanQuery();
 		booleanQuery.add(titleQuery, Occur.SHOULD);
 		booleanQuery.add(contentQuery, Occur.SHOULD);
