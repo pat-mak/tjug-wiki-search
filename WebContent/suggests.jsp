@@ -4,7 +4,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
 	pageEncoding="UTF-8"%>
 <jsp:useBean id="searchFacade"
-	class="pl.jug.trojmiasto.lucene.facade.SearchFacade" scope="request" />
+	class="pl.jug.trojmiasto.lucene.facade.SearchFacade" scope="application" />
 <%
 	String prefix = request.getParameter("term");
 

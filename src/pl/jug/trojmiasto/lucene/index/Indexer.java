@@ -28,12 +28,15 @@ public class Indexer {
 	private IndexWriter indexWriter;
 	private TaxonomyWriter taxonomyWriter;
 	private FacetFields facetFields;
+	private String indexPath;
+	private OpenMode openMode;
 
 	public Indexer(String indexPath, OpenMode openMode) throws IOException {
-		openIndex(indexPath, openMode);
+		this.indexPath = indexPath;
+		this.openMode = openMode;
 	}
 
-	private void openIndex(String indexPath, OpenMode openMode)
+	private void openIndex()
 			throws IOException {
 		Map<String, Analyzer> analyzerMap = new HashMap<String, Analyzer>();
 		analyzerMap.put(WikiIndexConfig.TITLE_NGRAM_FIELD_NAME,
@@ -53,6 +56,7 @@ public class Indexer {
 	}
 
 	public void indexAll(WikiDataProvider wikiDataProvider) throws IOException {
+		openIndex();
 		for (Article article : wikiDataProvider) {
 			addArticle(article);
 		}
@@ -103,5 +107,11 @@ public class Indexer {
 	private void closeIndex() throws IOException {
 		indexWriter.close();
 		taxonomyWriter.close();
+	}
+
+	public void addSingleArticle(Article article) throws IOException {
+		openIndex();
+		addArticle(article);
+		closeIndex();
 	}
 }

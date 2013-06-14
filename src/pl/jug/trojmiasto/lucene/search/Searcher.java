@@ -19,8 +19,6 @@ import org.apache.lucene.facet.search.FacetsCollector;
 import org.apache.lucene.facet.taxonomy.CategoryPath;
 import org.apache.lucene.facet.taxonomy.TaxonomyReader;
 import org.apache.lucene.facet.taxonomy.directory.DirectoryTaxonomyReader;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.analyzing.AnalyzingQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -29,9 +27,9 @@ import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MultiCollector;
-import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopDocsCollector;
 import org.apache.lucene.search.TopScoreDocCollector;
@@ -49,55 +47,52 @@ import pl.jug.trojmiasto.lucene.model.Category;
 public class Searcher {
 
 	private static final String HL_SEPARATOR = "<span class=\"separator\">&nbsp;(...)</span>";
-	private IndexSearcher searcher;
 	private TaxonomyReader taxonomyReader;
+	private SearcherManager searcherManager;
 
 	public Searcher() throws IOException {
-		searcher = new IndexSearcher(DirectoryReader.open(FSDirectory
-				.open(new File(WikiIndexConfig.INDEX_PATH))));
+		searcherManager = new SearcherManager(FSDirectory.open(new File(
+				WikiIndexConfig.INDEX_PATH)), null);
 		taxonomyReader = new DirectoryTaxonomyReader(FSDirectory.open(new File(
 				WikiIndexConfig.INDEX_PATH
 						+ WikiIndexConfig.TAXO_INDEX_PATH_SUFFIX)));
 	}
 
-	public SearchResult searchPrefix(String query, int i) throws IOException {
-		Query prefixQuery = new PrefixQuery(new Term(
-				WikiIndexConfig.TITLE_FIELD_NAME, query));
-		TopDocs topDocs = searcher.search(prefixQuery, i);
-		List<Article> articles = extractArticlesFromTopDocs(topDocs);
-		SearchResult searchResult = new SearchResult();
-		searchResult.setArticles(articles);
-		return searchResult;
-	}
-
 	public SearchResult searchNGram(String query, int i) throws IOException {
+		reopen();
 		QueryParser titleQueryParser = new AnalyzingQueryParser(
 				WikiIndexConfig.LUCENE_VERSION,
 				WikiIndexConfig.TITLE_NGRAM_FIELD_NAME, new StandardAnalyzer(
 						WikiIndexConfig.LUCENE_VERSION, new CharArraySet(
 								WikiIndexConfig.LUCENE_VERSION, 0, true)));
 		titleQueryParser.setDefaultOperator(Operator.AND);
-		
+
 		TopDocs topDocs;
+		List<Article> articles;
+		IndexSearcher searcher = searcherManager.acquire();
 		try {
-			Query parsedQuery = titleQueryParser.parse(query);
-			System.out.println("Query: " + parsedQuery);
-			topDocs = searcher.search(parsedQuery, i);
-		} catch (ParseException e) {
-			SearchResult failed = new SearchResult()
-					.markFailed("Problem z parsowaniem zapytania " + query
-							+ " " + e.getMessage());
-			e.printStackTrace();
-			return failed;
+			try {
+				Query parsedQuery = titleQueryParser.parse(query);
+				System.out.println("Query: " + parsedQuery);
+				topDocs = searcher.search(parsedQuery, i);
+			} catch (ParseException e) {
+				SearchResult failed = new SearchResult()
+						.markFailed("Problem z parsowaniem zapytania " + query
+								+ " " + e.getMessage());
+				e.printStackTrace();
+				return failed;
+			}
+			articles = extractArticlesFromTopDocs(topDocs, searcher);
+		} finally {
+			searcherManager.release(searcher);
 		}
-		List<Article> articles = extractArticlesFromTopDocs(topDocs);
 		SearchResult searchResult = new SearchResult();
 		searchResult.setArticles(articles);
 		return searchResult;
 	}
 
-	private List<Article> extractArticlesFromTopDocs(TopDocs topDocs)
-			throws IOException {
+	private List<Article> extractArticlesFromTopDocs(TopDocs topDocs,
+			IndexSearcher searcher) throws IOException {
 		ScoreDoc[] scoreDocs = topDocs.scoreDocs;
 		List<Article> articles = new LinkedList<Article>();
 		for (ScoreDoc scoreDoc : scoreDocs) {
@@ -113,6 +108,7 @@ public class Searcher {
 	}
 
 	public SearchResult search(String query, int count) throws IOException {
+		reopen();
 		SearchResult searchResult = new SearchResult();
 		BooleanQuery booleanQuery;
 		try {
@@ -125,30 +121,44 @@ public class Searcher {
 			return searchResult;
 		}
 
-		FacetsCollector categoryCollector = prepateCategoryCollector();
-		TopDocsCollector<ScoreDoc> docsCollector = TopScoreDocCollector.create(
-				count, false);
-		searcher.search(booleanQuery,
-				MultiCollector.wrap(docsCollector, categoryCollector));
-
-		Highlighter highlighter = new Highlighter(new SimpleHTMLFormatter(),
-				new QueryScorer(booleanQuery));
-
-		TopDocs topDocs = docsCollector.topDocs();
+		IndexSearcher searcher = searcherManager.acquire();
 		try {
-			searchResult.setArticles(extractArticlesFromTopDocs(topDocs,
-					highlighter));
-			searchResult
-					.setCategories(extractCaegoriesFromTopDocs(categoryCollector));
-		} catch (InvalidTokenOffsetsException e) {
-			searchResult
-					.markFailed("Podświetlanie było złe! i tory też...były złe, bo "
-							+ e.getMessage());
-			e.printStackTrace();
-			return searchResult;
+			FacetsCollector categoryCollector = prepateCategoryCollector(searcher);
+			TopDocsCollector<ScoreDoc> docsCollector = TopScoreDocCollector
+					.create(count, false);
+
+			searcher.search(booleanQuery,
+					MultiCollector.wrap(docsCollector, categoryCollector));
+
+			Highlighter highlighter = new Highlighter(
+					new SimpleHTMLFormatter(), new QueryScorer(booleanQuery));
+
+			TopDocs topDocs = docsCollector.topDocs();
+			try {
+				searchResult.setArticles(extractArticlesFromTopDocs(topDocs,
+						highlighter, searcher));
+				searchResult
+						.setCategories(extractCaegoriesFromTopDocs(categoryCollector));
+			} catch (InvalidTokenOffsetsException e) {
+				searchResult
+						.markFailed("Podświetlanie było złe! i tory też...były złe, bo "
+								+ e.getMessage());
+				e.printStackTrace();
+				return searchResult;
+			}
+			searchResult.setCount(topDocs.totalHits);
+		} finally {
+			searcherManager.release(searcher);
 		}
-		searchResult.setCount(topDocs.totalHits);
 		return searchResult;
+	}
+
+	private void reopen() {
+		try {
+			searcherManager.maybeRefresh();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private BooleanQuery prepareBooleanQuery(String userQuery)
@@ -173,8 +183,8 @@ public class Searcher {
 	}
 
 	private List<Article> extractArticlesFromTopDocs(TopDocs topDocs,
-			Highlighter highlighter) throws IOException,
-			InvalidTokenOffsetsException {
+			Highlighter highlighter, IndexSearcher searcher)
+			throws IOException, InvalidTokenOffsetsException {
 		ScoreDoc[] scoreDocs = topDocs.scoreDocs;
 		List<Article> articles = new LinkedList<Article>();
 		for (ScoreDoc scoreDoc : scoreDocs) {
@@ -197,7 +207,7 @@ public class Searcher {
 		return articles;
 	}
 
-	private FacetsCollector prepateCategoryCollector() {
+	private FacetsCollector prepateCategoryCollector(IndexSearcher searcher) {
 		FacetRequest facetRequest = new CountFacetRequest(new CategoryPath(
 				WikiIndexConfig.ROOT_CAT), 20);
 		facetRequest.setDepth(2);
