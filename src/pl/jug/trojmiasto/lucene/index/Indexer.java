@@ -2,9 +2,13 @@ package pl.jug.trojmiasto.lucene.index;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -31,9 +35,14 @@ public class Indexer {
 
 	private void openIndex(String indexPath, OpenMode openMode)
 			throws IOException {
+		Map<String, Analyzer> analyzerMap = new HashMap<String, Analyzer>();
+		analyzerMap.put(WikiIndexConfig.TITLE_NGRAM_FIELD_NAME,
+				new EdgeNGramAnalyzer(WikiIndexConfig.LUCENE_VERSION));
+		Analyzer analyzer = new PerFieldAnalyzerWrapper(new StandardAnalyzer(
+				WikiIndexConfig.LUCENE_VERSION), analyzerMap);
+
 		IndexWriterConfig conf = new IndexWriterConfig(
-				WikiIndexConfig.LUCENE_VERSION, new StandardAnalyzer(
-						WikiIndexConfig.LUCENE_VERSION));
+				WikiIndexConfig.LUCENE_VERSION, analyzer);
 		conf.setOpenMode(openMode);
 		indexWriter = new IndexWriter(FSDirectory.open(new File(indexPath)),
 				conf);
@@ -75,6 +84,8 @@ public class Indexer {
 		textFieldNotAnalyzed.setTokenized(false);
 		Field title = new Field(WikiIndexConfig.TITLE_FIELD_NAME,
 				article.getTitle(), textField);
+		Field titleNGram = new Field(WikiIndexConfig.TITLE_NGRAM_FIELD_NAME,
+				article.getTitle(), textField);
 		Field content = new Field(WikiIndexConfig.CONTENT_FIELD_NAME,
 				article.getContent(), textField);
 		Field date = new Field(WikiIndexConfig.TIME_STRING_FIELD_NAME,
@@ -82,6 +93,7 @@ public class Indexer {
 		Field category = new Field(WikiIndexConfig.CATEGORY_FIELD_NAME,
 				article.getCategory(), textField);
 		document.add(title);
+		document.add(titleNGram);
 		document.add(content);
 		document.add(date);
 		document.add(category);

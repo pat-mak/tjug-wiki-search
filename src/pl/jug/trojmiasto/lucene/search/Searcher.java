@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.facet.params.FacetSearchParams;
 import org.apache.lucene.facet.search.CountFacetRequest;
@@ -23,6 +24,7 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.analyzing.AnalyzingQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParser.Operator;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
@@ -30,11 +32,9 @@ import org.apache.lucene.search.MultiCollector;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.SortField;
-import org.apache.lucene.search.SortField.Type;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.TopFieldCollector;
+import org.apache.lucene.search.TopDocsCollector;
+import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.highlight.Highlighter;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.highlight.QueryScorer;
@@ -64,6 +64,32 @@ public class Searcher {
 		Query prefixQuery = new PrefixQuery(new Term(
 				WikiIndexConfig.TITLE_FIELD_NAME, query));
 		TopDocs topDocs = searcher.search(prefixQuery, i);
+		List<Article> articles = extractArticlesFromTopDocs(topDocs);
+		SearchResult searchResult = new SearchResult();
+		searchResult.setArticles(articles);
+		return searchResult;
+	}
+
+	public SearchResult searchNGram(String query, int i) throws IOException {
+		QueryParser titleQueryParser = new AnalyzingQueryParser(
+				WikiIndexConfig.LUCENE_VERSION,
+				WikiIndexConfig.TITLE_NGRAM_FIELD_NAME, new StandardAnalyzer(
+						WikiIndexConfig.LUCENE_VERSION, new CharArraySet(
+								WikiIndexConfig.LUCENE_VERSION, 0, true)));
+		titleQueryParser.setDefaultOperator(Operator.AND);
+		
+		TopDocs topDocs;
+		try {
+			Query parsedQuery = titleQueryParser.parse(query);
+			System.out.println("Query: " + parsedQuery);
+			topDocs = searcher.search(parsedQuery, i);
+		} catch (ParseException e) {
+			SearchResult failed = new SearchResult()
+					.markFailed("Problem z parsowaniem zapytania " + query
+							+ " " + e.getMessage());
+			e.printStackTrace();
+			return failed;
+		}
 		List<Article> articles = extractArticlesFromTopDocs(topDocs);
 		SearchResult searchResult = new SearchResult();
 		searchResult.setArticles(articles);
@@ -100,17 +126,15 @@ public class Searcher {
 		}
 
 		FacetsCollector categoryCollector = prepateCategoryCollector();
-		Sort sort = new Sort(new SortField(
-				WikiIndexConfig.TIME_STRING_FIELD_NAME, Type.STRING, true));
-		TopFieldCollector topFieldCollector = TopFieldCollector.create(sort,
-				count, true, false, false, false);
+		TopDocsCollector<ScoreDoc> docsCollector = TopScoreDocCollector.create(
+				count, false);
 		searcher.search(booleanQuery,
-				MultiCollector.wrap(topFieldCollector, categoryCollector));
+				MultiCollector.wrap(docsCollector, categoryCollector));
 
 		Highlighter highlighter = new Highlighter(new SimpleHTMLFormatter(),
 				new QueryScorer(booleanQuery));
 
-		TopDocs topDocs = topFieldCollector.topDocs();
+		TopDocs topDocs = docsCollector.topDocs();
 		try {
 			searchResult.setArticles(extractArticlesFromTopDocs(topDocs,
 					highlighter));
@@ -142,7 +166,6 @@ public class Searcher {
 		Query contentQuery = null;
 		titleQuery = titleQueryParser.parse(userQuery);
 		contentQuery = contentQueryParser.parse(userQuery);
-		contentQuery.setBoost(20.0f);
 		BooleanQuery booleanQuery = new BooleanQuery();
 		booleanQuery.add(titleQuery, Occur.SHOULD);
 		booleanQuery.add(contentQuery, Occur.SHOULD);
